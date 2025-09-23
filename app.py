@@ -664,15 +664,15 @@ def main():
     st.sidebar.markdown("## ⚙️ SYSTEM CONTROLS")
 
     auto_refresh = st.sidebar.checkbox(
-        "🔄 Enable Auto-Refresh (10s)", value=True)
+        "Enable Auto-Refresh (10s)", value=True)
 
-    if st.sidebar.button("🔄 REFRESH DATA", type="primary", use_container_width=True):
+    if st.sidebar.button("REFRESH DATA", type="primary", use_container_width=True):
         with st.spinner("Updating sensor data..."):
             update_dashboard_data()
         st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("## 🛰️ SYSTEM STATUS")
+    st.sidebar.markdown("## SYSTEM UPDATE")
 
     # Connection status warning
     if not CONNECTION_STRING:
@@ -680,17 +680,17 @@ def main():
             "⚠️ IoT Hub Connection String is not set in your .env file.", icon="⚠️")
 
     # Status metrics
-    status_color = "🟢" if "CONNECTED" in st.session_state.iot_hub_status else "🔴"
-    st.sidebar.markdown(
-        f"**IoT Hub Status:** {st.session_state.iot_hub_status}")
+    # status_color = "🟢" if "CONNECTED" in st.session_state.iot_hub_status else "🔴"
+    # st.sidebar.markdown(
+    #     f"**IoT Hub Status:** {st.session_state.iot_hub_status}")
 
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        st.metric("Active Nodes", len(st.session_state.devices))
-        st.metric("Messages Sent", st.session_state.messages_sent_to_hub)
-    with col2:
-        st.metric("Total Alerts", st.session_state.total_alerts)
-        st.metric("Queue Size", st.session_state.message_queue.qsize())
+    # col1, col2 = st.sidebar.columns(2)
+    # with col1:
+    #     st.metric("Active Nodes", len(st.session_state.devices))
+    #     st.metric("Messages Sent", st.session_state.messages_sent_to_hub)
+    # with col2:
+    #     st.metric("Total Alerts", st.session_state.total_alerts)
+    #     st.metric("Queue Size", st.session_state.message_queue.qsize())
 
     st.sidebar.write(
         f"**Last Update:** {st.session_state.last_update.strftime('%H:%M:%S')}")
@@ -700,7 +700,7 @@ def main():
         ["Status", "System Analytics", "Event Log"])
 
     with tab1:
-        st.subheader("🔮 Live Nodes")
+        st.subheader("Live Nodes")
 
         # Street lamp visualization
         cols = st.columns(6)
