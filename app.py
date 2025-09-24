@@ -127,54 +127,39 @@ FEATURE_ORDER = [
 def iot_hub_sender(message_queue: queue.Queue):
     """Runs in a background thread to send messages from the queue to Azure IoT Hub."""
     async def sender_loop():
-        device_client = None
-        retry_delay = 5  # Initial retry delay in seconds
+        if not CONNECTION_STRING or "YourIoTHubConnectionString" in CONNECTION_STRING:
+            st.session_state.iot_hub_status = "🔴 OFFLINE (Not Configured)"
+            return
+
+        st.session_state.iot_hub_status = "🟡 CONNECTING..."
+        try:
+            device_client = IoTHubDeviceClient.create_from_connection_string(
+                CONNECTION_STRING)
+            await device_client.connect()
+            st.session_state.iot_hub_status = "🟢 CONNECTED"
+        except Exception as e:
+            st.session_state.iot_hub_status = f"🔴 ERROR"
+            print(f"IOT HUB ERROR: {e}")
+            return
 
         while True:
             try:
-                # If client is not connected, attempt to connect/reconnect
-                if not device_client or not device_client.connected:
-                    if device_client: # Shutdown existing client if it exists
-                        await device_client.shutdown()
-
-                    if not CONNECTION_STRING or "YourIoTHubConnectionString" in CONNECTION_STRING:
-                        st.session_state.iot_hub_status = "🔴 OFFLINE (Not Configured)"
-                        await asyncio.sleep(10) # Wait longer if not configured
-                        continue
-
-                    st.session_state.iot_hub_status = f"🔁 RETRYING in {retry_delay}s..."
-                    await asyncio.sleep(retry_delay)
-                    
-                    print(f"IOT HUB SENDER: Attempting to connect...")
-                    device_client = IoTHubDeviceClient.create_from_connection_string(CONNECTION_STRING)
-                    await device_client.connect()
-                    
-                    st.session_state.iot_hub_status = "🟢 CONNECTED"
-                    print("IOT HUB SENDER: Connection successful.")
-                    retry_delay = 5 # Reset retry delay on success
-
-                # If connected, process the queue
-                while not message_queue.empty():
-                    message = message_queue.get_nowait()
-                    if message:
-                        await device_client.send_message(json.dumps(message))
-                        st.session_state.messages_sent_to_hub += 1
-                
-                await asyncio.sleep(1) # Brief pause when queue is empty
-
-            except Exception as e:
-                print(f"IOT HUB SENDER: An error occurred: {e}. Preparing to retry.")
+                message = message_queue.get_nowait()
+                if message:
+                    await device_client.send_message(json.dumps(message))
+                    st.session_state.messages_sent_to_hub += 1
+            except queue.Empty:
+                await asyncio.sleep(1)
+            except ConnectionDroppedError:
                 st.session_state.iot_hub_status = "🔁 RECONNECTING..."
-                if device_client and device_client.connected:
-                    await device_client.shutdown()
-                device_client = None
-                
-                # Exponential backoff
-                retry_delay = min(60, retry_delay * 2) # Double delay up to 1 minute
-
+                await device_client.connect()
+            except Exception as e:
+                st.session_state.iot_hub_status = "🔴 ERROR"
+                print(f"IOT HUB ERROR: {e}")
+                await device_client.shutdown()
+                return
     nest_asyncio.apply()
     asyncio.run(sender_loop())
-
 
 # --- Device Simulation Class ---
 
@@ -597,7 +582,7 @@ def main():
                 unsafe_allow_html=True)
 
     # --- Sidebar ---
-    st.sidebar.markdown("## ⚙️ SYSTEM CONTROLS")
+    st.sidebar.markdown("## SYSTEM CONTROLS")
     auto_refresh = st.sidebar.checkbox("Enable Auto-Refresh (10s)", value=True)
     if st.sidebar.button("FORCE DATA REFRESH", type="primary", use_container_width=True):
         with st.spinner("Updating sensor data..."):
@@ -608,11 +593,11 @@ def main():
     if st.session_state.historical_data:
         csv = pd.DataFrame(
             st.session_state.historical_data).to_csv(index=False)
-        st.sidebar.download_button(label="📥 Export Event Log (CSV)", data=csv,
+        st.sidebar.download_button(label="Export Event Log (CSV)", data=csv,
                                    file_name=f"UAI_event_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", mime='text/csv', use_container_width=True)
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("## 🛰️ SYSTEM STATUS")
+    st.sidebar.markdown("## SYSTEM STATUS")
     if not CONNECTION_STRING:
         st.sidebar.warning("IoT Hub Connection String missing.", icon="⚠️")
 
@@ -620,13 +605,13 @@ def main():
     # health = get_system_health()
     # st.sidebar.progress(int(health), text=f"Network Health: {health:.1f}%")
 
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        st.metric("Active Nodes", len(st.session_state.devices))
-        st.metric("Messages Sent", st.session_state.messages_sent_to_hub)
-    with col2:
-        st.metric("Total Alerts", st.session_state.total_alerts)
-        st.metric("Queue Size", st.session_state.message_queue.qsize())
+    # col1, col2 = st.sidebar.columns(2)
+    # with col1:
+    #     st.metric("Active Nodes", len(st.session_state.devices))
+    #     st.metric("Messages Sent", st.session_state.messages_sent_to_hub)
+    # with col2:
+    #     st.metric("Total Alerts", st.session_state.total_alerts)
+    #     st.metric("Queue Size", st.session_state.message_queue.qsize())
 
     # uptime = get_uptime()
     # st.sidebar.write(f"**Uptime:** {str(uptime).split('.')[0]}")
@@ -653,7 +638,7 @@ def main():
                 st.markdown(
                     f"""<div class="metric-card"><h4>🏢 {device.config['location']['area']}</h4><p><strong>Status:</strong> {emoji} {device.last_predicted_quality.title()}</p><p><strong>Zone Type:</strong> {device.config['location']['zone']}</p><p><strong>Device ID:</strong> {device.device_id}</p></div>""", unsafe_allow_html=True)
     with tab2:
-        st.subheader("🔮 AQI Forecast (Next 3 Hours)")
+        st.subheader("AQI Forecast (Next 3 Hours)")
         forecast_df = st.session_state.forecast_data
         if not forecast_df.empty:
             cols = st.columns(3)
@@ -674,7 +659,7 @@ def main():
             st.plotly_chart(create_sensor_trends_chart(),
                             use_container_width=True)
     with tab3:
-        st.subheader("📋 Recent Network Alerts")
+        st.subheader("Recent Network Alerts")
         if st.session_state.historical_data:
             df = pd.DataFrame(st.session_state.historical_data)
             df['timestamp_dt'] = pd.to_datetime(df['timestamp'])
