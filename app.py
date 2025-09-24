@@ -36,7 +36,7 @@ st.markdown("""
     
     :root {
         --primary-color: #00D4AA; --secondary-color: #0077BE; --glow-color: rgba(0, 212, 170, 0.5);
-        --dark-bg: #0A0F1C; --card-bg: #1A1F2E; --border-color: #2A3B4F;
+        --dark-bg: #0A0F1C; --dark-bg: #fff; --border-color: #2A3B4F;
         --text-primary: #FFFFFF; --text-secondary: #8B949E; --success-color: #2ECC71;
         --warning-color: #F1C40F; --danger-color: #E74C3C;
     }
@@ -660,16 +660,37 @@ def main():
                             use_container_width=True)
     with tab3:
         st.subheader("Recent Network Alerts")
+
         if st.session_state.historical_data:
             df = pd.DataFrame(st.session_state.historical_data)
             df['timestamp_dt'] = pd.to_datetime(df['timestamp'])
-            for entry in df.sort_values(by="timestamp_dt", ascending=False).head(20).to_dict('records'):
+
+            # --- Add a filter ---
+            quality_filter = st.selectbox(
+                "Filter by Quality",
+                options=["All", "good", "moderate", "poor", "hazardous"],
+                index=0
+            )
+            if quality_filter != "All":
+                df = df[df['quality'] == quality_filter]
+
+            # --- Show recent alerts ---
+            for i, entry in enumerate(df.sort_values(by="timestamp_dt", ascending=False).head(20).to_dict('records')):
                 emoji = {"good": "🟢", "moderate": "🟡", "poor": "🟠",
-                         "hazardous": "🔴"}.get(entry['quality'], "⚪")
-                st.markdown(
-                    f"""<div style="padding: 8px; margin: 4px 0; background: var(--card-bg); border-radius: 8px;"><strong>{entry['area']}</strong> - Status changed to {emoji} {entry['quality'].title()}<small style="float: right;">{entry['timestamp_dt'].strftime('%H:%M:%S')}</small></div>""", unsafe_allow_html=True)
+                        "hazardous": "🔴"}.get(entry['quality'], "⚪")
+
+                with st.expander(f"{entry['area']} - {emoji} {entry['quality'].title()}  "
+                    f"({entry['timestamp_dt'].strftime('%H:%M:%S')})"):
+                    st.markdown(f"**Area:** {entry['area']}")
+                    st.markdown(f"**Quality:** {emoji} {entry['quality'].title()}")
+                    st.markdown(f"**PM2.5:** {entry.get('PM2.5', 'N/A')}")
+                    st.markdown(f"**CO:** {entry.get('CO', 'N/A')}")
+                    st.markdown(f"**Timestamp:** {entry['timestamp_dt'].strftime('%Y-%m-%d %H:%M:%S')}")
+
+
         else:
             st.info("Awaiting network activity...")
+
 
     if auto_refresh:
         update_dashboard_data()
