@@ -21,6 +21,10 @@ from streamlit_autorefresh import st_autorefresh
 # Load environment variables from a .env file
 load_dotenv()
 
+# Initialize session state variables if not already present
+if "messages_sent_to_hub" not in st.session_state:
+    st.session_state.messages_sent_to_hub = []
+
 # --- Page Configuration ---
 st.set_page_config(
     page_title="Urban Air Intelligence",
@@ -677,20 +681,20 @@ def main():
             # --- Show recent alerts ---
             for i, entry in enumerate(df.sort_values(by="timestamp_dt", ascending=False).head(20).to_dict('records')):
                 emoji = {"good": "🟢", "moderate": "🟡", "poor": "🟠",
-                        "hazardous": "🔴"}.get(entry['quality'], "⚪")
+                         "hazardous": "🔴"}.get(entry['quality'], "⚪")
 
                 with st.expander(f"{entry['area']} - {emoji} {entry['quality'].title()}  "
-                    f"({entry['timestamp_dt'].strftime('%H:%M:%S')})"):
+                                 f"({entry['timestamp_dt'].strftime('%H:%M:%S')})"):
                     st.markdown(f"**Area:** {entry['area']}")
-                    st.markdown(f"**Quality:** {emoji} {entry['quality'].title()}")
+                    st.markdown(
+                        f"**Quality:** {emoji} {entry['quality'].title()}")
                     st.markdown(f"**PM2.5:** {entry.get('PM2.5', 'N/A')}")
                     st.markdown(f"**CO:** {entry.get('CO', 'N/A')}")
-                    st.markdown(f"**Timestamp:** {entry['timestamp_dt'].strftime('%Y-%m-%d %H:%M:%S')}")
-
+                    st.markdown(
+                        f"**Timestamp:** {entry['timestamp_dt'].strftime('%Y-%m-%d %H:%M:%S')}")
 
         else:
             st.info("Awaiting network activity...")
-
 
     if auto_refresh:
         update_dashboard_data()
