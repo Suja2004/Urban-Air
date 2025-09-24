@@ -622,7 +622,7 @@ def main():
     tab1, tab2, tab3 = st.tabs(
         ["[ STATUS ]", "[ ANALYTICS ]", "[ EVENT LOG ]"])
     with tab1:
-        st.subheader("Live Network Status")
+        st.subheader("Live Lamp Status")
         cols = st.columns(6)
         for i, device in enumerate(st.session_state.devices):
             with cols[i]:
