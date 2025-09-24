@@ -127,39 +127,54 @@ FEATURE_ORDER = [
 def iot_hub_sender(message_queue: queue.Queue):
     """Runs in a background thread to send messages from the queue to Azure IoT Hub."""
     async def sender_loop():
-        if not CONNECTION_STRING or "YourIoTHubConnectionString" in CONNECTION_STRING:
-            st.session_state.iot_hub_status = "🔴 OFFLINE (Not Configured)"
-            return
-
-        st.session_state.iot_hub_status = "🟡 CONNECTING..."
-        try:
-            device_client = IoTHubDeviceClient.create_from_connection_string(
-                CONNECTION_STRING)
-            await device_client.connect()
-            st.session_state.iot_hub_status = "🟢 CONNECTED"
-        except Exception as e:
-            st.session_state.iot_hub_status = f"🔴 ERROR"
-            print(f"IOT HUB ERROR: {e}")
-            return
+        device_client = None
+        retry_delay = 5  # Initial retry delay in seconds
 
         while True:
             try:
-                message = message_queue.get_nowait()
-                if message:
-                    await device_client.send_message(json.dumps(message))
-                    st.session_state.messages_sent_to_hub += 1
-            except queue.Empty:
-                await asyncio.sleep(1)
-            except ConnectionDroppedError:
-                st.session_state.iot_hub_status = "🔁 RECONNECTING..."
-                await device_client.connect()
+                # If client is not connected, attempt to connect/reconnect
+                if not device_client or not device_client.connected:
+                    if device_client: # Shutdown existing client if it exists
+                        await device_client.shutdown()
+
+                    if not CONNECTION_STRING or "YourIoTHubConnectionString" in CONNECTION_STRING:
+                        st.session_state.iot_hub_status = "🔴 OFFLINE (Not Configured)"
+                        await asyncio.sleep(10) # Wait longer if not configured
+                        continue
+
+                    st.session_state.iot_hub_status = f"🔁 RETRYING in {retry_delay}s..."
+                    await asyncio.sleep(retry_delay)
+                    
+                    print(f"IOT HUB SENDER: Attempting to connect...")
+                    device_client = IoTHubDeviceClient.create_from_connection_string(CONNECTION_STRING)
+                    await device_client.connect()
+                    
+                    st.session_state.iot_hub_status = "🟢 CONNECTED"
+                    print("IOT HUB SENDER: Connection successful.")
+                    retry_delay = 5 # Reset retry delay on success
+
+                # If connected, process the queue
+                while not message_queue.empty():
+                    message = message_queue.get_nowait()
+                    if message:
+                        await device_client.send_message(json.dumps(message))
+                        st.session_state.messages_sent_to_hub += 1
+                
+                await asyncio.sleep(1) # Brief pause when queue is empty
+
             except Exception as e:
-                st.session_state.iot_hub_status = "🔴 ERROR"
-                print(f"IOT HUB ERROR: {e}")
-                await device_client.shutdown()
-                return
+                print(f"IOT HUB SENDER: An error occurred: {e}. Preparing to retry.")
+                st.session_state.iot_hub_status = "🔁 RECONNECTING..."
+                if device_client and device_client.connected:
+                    await device_client.shutdown()
+                device_client = None
+                
+                # Exponential backoff
+                retry_delay = min(60, retry_delay * 2) # Double delay up to 1 minute
+
     nest_asyncio.apply()
     asyncio.run(sender_loop())
+
 
 # --- Device Simulation Class ---
 
@@ -601,9 +616,9 @@ def main():
     if not CONNECTION_STRING:
         st.sidebar.warning("IoT Hub Connection String missing.", icon="⚠️")
 
-    st.sidebar.markdown(f"**IoT Hub Link:** {st.session_state.iot_hub_status}")
-    health = get_system_health()
-    st.sidebar.progress(int(health), text=f"Network Health: {health:.1f}%")
+    # st.sidebar.markdown(f"**IoT Hub Link:** {st.session_state.iot_hub_status}")
+    # health = get_system_health()
+    # st.sidebar.progress(int(health), text=f"Network Health: {health:.1f}%")
 
     col1, col2 = st.sidebar.columns(2)
     with col1:
@@ -613,8 +628,8 @@ def main():
         st.metric("Total Alerts", st.session_state.total_alerts)
         st.metric("Queue Size", st.session_state.message_queue.qsize())
 
-    uptime = get_uptime()
-    st.sidebar.write(f"**Uptime:** {str(uptime).split('.')[0]}")
+    # uptime = get_uptime()
+    # st.sidebar.write(f"**Uptime:** {str(uptime).split('.')[0]}")
     st.sidebar.write(
         f"**Last Update:** {st.session_state.last_update.strftime('%H:%M:%S')}")
 
