@@ -21,6 +21,7 @@ Supports real-time data ingestion, forecasting, and interactive filtering of net
 git clone https://github.com/suja2004/Urban-Air.git
 cd Urban-Air-main
 ```
+---
 ### 2. Create a virtual environment
 ```
 # Windows
@@ -32,12 +33,13 @@ python -m venv .venv
 python3 -m venv .venv
 source .venv/bin/activate
 ```
+---
 ### 3. Install dependencies
 ```
 pip install -r requirements.txt
 ```
-
-### Run the App
+---
+### 4.Run the App
 ```
 streamlit run app.py
 ```
@@ -46,19 +48,21 @@ The app will launch in your browser at:
 ```
 http://localhost:8501
 ```
-
+---
+---
 ### ⚙️ Configuration
 * Auto-refresh: Toggle in the UI to refresh data every 10s.
 * Forecasting: Uses simple trend-based forecasting for PM2.5.
 * Azure IoT Hub (optional): If you connect devices, configure credentials in a .env file. Example:
  ```
- IOTHUB_CONNECTION_STRING="your-azure-iot-hub-connection-string"
+ IOTHUB_DEVICE_CONNECTION_STRING="your-azure-iot-hub-connection-string"
 ```
-
+---
 ### 📊 Dashboard Sections
 * Current AQI: Real-time PM2.5 and CO₂ readings
 * Forecast (Next 3 Hours): Predictive AQI with health status indicators
 * Recent Network Alerts: Last 20 alerts, with filtering and expandable details
 * Visualization: Interactive charts for historical and forecast data
 
-### 🛠️ Developed for **AINNOVATION 2025 II Hackathon**
+---
+🛠️ Developed for **AINNOVATION 2025 II Hackathon**
